@@ -5,9 +5,11 @@ import com.codinginflow.mvvmnewsapp.api.NewsApi
 import com.codinginflow.mvvmnewsapp.util.Resource
 import com.codinginflow.mvvmnewsapp.util.networkBoundResource
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import retrofit2.HttpException
 import java.io.IOException
 import javax.inject.Inject
+import java.util.concurrent.TimeUnit
 
 class NewsRepository @Inject constructor(
     private val newsApi: NewsApi,
@@ -16,6 +18,7 @@ class NewsRepository @Inject constructor(
     private val newsArticleDao = newsArticleDb.newsArticleDao()
 
     fun getBreakingNews(
+        forceRefresh: Boolean,
         onFetchSuccess: () -> Unit,
         onFetchFailed: (Throwable) -> Unit
     ): Flow<Resource<List<NewsArticle>>> =
@@ -28,13 +31,19 @@ class NewsRepository @Inject constructor(
                 response.articles
             },
             saveFetchResult = { serverBreakingNewsArticles ->
+                val bookmarkedArticles = newsArticleDao.getAllBookmarkedArticles().first()
+
                 val breakingNewsArticles =
                     serverBreakingNewsArticles.map { serverBreakingNewsArticle ->
+                        val isBookmarked = bookmarkedArticles.any { bookmarkedArticle ->
+                            bookmarkedArticle.url == serverBreakingNewsArticle.url
+                        }
+
                         NewsArticle(
                             title = serverBreakingNewsArticle.title,
                             url = serverBreakingNewsArticle.url,
                             thumbnailUrl = serverBreakingNewsArticle.urlToImage,
-                            isBookmarked = false
+                            isBookmarked = isBookmarked
                         )
                     }
 
@@ -48,6 +57,20 @@ class NewsRepository @Inject constructor(
                     newsArticleDao.insertBreakingNews(breakingNews)
                 }
             },
+            shouldFetch = { cachedArticles ->
+                if (forceRefresh) {
+                    true
+                } else {
+                    val sortedArticles = cachedArticles.sortedBy { article ->
+                        article.updatedAt
+                    }
+                    val oldestTimestamp = sortedArticles.firstOrNull()?.updatedAt
+                    val needsRefresh = oldestTimestamp == null ||
+                            oldestTimestamp < System.currentTimeMillis() -
+                            TimeUnit.MINUTES.toMillis(5)
+                    needsRefresh
+                }
+            },
             onFetchSuccess = onFetchSuccess,
             onFetchFailed = { t ->
                 if (t !is HttpException && t !is IOException) {
@@ -56,4 +79,19 @@ class NewsRepository @Inject constructor(
                 onFetchFailed(t)
             }
         )
+
+    fun getAllBookmarkedArticles(): Flow<List<NewsArticle>> =
+        newsArticleDao.getAllBookmarkedArticles()
+
+    suspend fun updateArticle(article: NewsArticle) {
+        newsArticleDao.updateArticle(article)
+    }
+
+    suspend fun resetAllBookmarks() {
+        newsArticleDao.resetAllBookmarks()
+    }
+
+    suspend fun deleteNonBookmarkedArticlesOlderThan(timestampInMillis: Long) {
+        newsArticleDao.deleteNonBookmarkedArticlesOlderThan(timestampInMillis)
+    }
 }
