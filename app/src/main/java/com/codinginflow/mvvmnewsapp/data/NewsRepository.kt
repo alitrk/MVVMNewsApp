@@ -1,5 +1,9 @@
 package com.codinginflow.mvvmnewsapp.data
 
+import androidx.paging.ExperimentalPagingApi
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import androidx.room.withTransaction
 import com.codinginflow.mvvmnewsapp.api.NewsApi
 import com.codinginflow.mvvmnewsapp.util.Resource
@@ -8,8 +12,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import retrofit2.HttpException
 import java.io.IOException
-import javax.inject.Inject
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 class NewsRepository @Inject constructor(
     private val newsApi: NewsApi,
@@ -79,6 +83,14 @@ class NewsRepository @Inject constructor(
                 onFetchFailed(t)
             }
         )
+
+    @OptIn(ExperimentalPagingApi::class)
+    fun getSearchResultsPaged(query: String): Flow<PagingData<NewsArticle>> =
+        Pager(
+            config = PagingConfig(pageSize = 20, maxSize = 200),
+            remoteMediator = SearchNewsRemoteMediator(query, newsApi, newsArticleDb),
+            pagingSourceFactory = { newsArticleDao.getSearchResultArticlesPaged(query) }
+        ).flow
 
     fun getAllBookmarkedArticles(): Flow<List<NewsArticle>> =
         newsArticleDao.getAllBookmarkedArticles()
