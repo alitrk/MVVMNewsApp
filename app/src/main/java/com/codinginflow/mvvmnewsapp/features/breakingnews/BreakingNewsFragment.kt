@@ -12,6 +12,8 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.codinginflow.mvvmnewsapp.MainActivity
 import com.codinginflow.mvvmnewsapp.R
 import com.codinginflow.mvvmnewsapp.databinding.FragmentBreakingNewsBinding
 import com.codinginflow.mvvmnewsapp.shared.NewsArticleListAdapter
@@ -19,17 +21,21 @@ import com.codinginflow.mvvmnewsapp.util.Resource
 import com.codinginflow.mvvmnewsapp.util.exhaustive
 import com.codinginflow.mvvmnewsapp.util.showSnackbar
 import dagger.hilt.android.AndroidEntryPoint
-
+import kotlinx.coroutines.flow.collect
 
 @AndroidEntryPoint
-class BreakingNewsFragment : Fragment(R.layout.fragment_breaking_news) {
+class BreakingNewsFragment : Fragment(R.layout.fragment_breaking_news),
+    MainActivity.OnBottomNavigationFragmentReselectedListener {
 
     private val viewModel: BreakingNewsViewModel by viewModels()
+
+    private var currentBinding: FragmentBreakingNewsBinding? = null
+    private val binding get() = currentBinding!!
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val binding = FragmentBreakingNewsBinding.bind(view)
+        currentBinding = FragmentBreakingNewsBinding.bind(view)
 
         val newsArticleAdapter = NewsArticleListAdapter(
             onItemClick = { article ->
@@ -41,6 +47,9 @@ class BreakingNewsFragment : Fragment(R.layout.fragment_breaking_news) {
                 viewModel.onBookmarkClick(article)
             }
         )
+
+        newsArticleAdapter.stateRestorationPolicy =
+            RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
 
         binding.apply {
             recyclerView.apply {
@@ -117,4 +126,13 @@ class BreakingNewsFragment : Fragment(R.layout.fragment_breaking_news) {
             }
             else -> super.onOptionsItemSelected(item)
         }
+
+    override fun onBottomNavigationFragmentReselected() {
+        binding.recyclerView.scrollToPosition(0)
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        currentBinding = null
+    }
 }

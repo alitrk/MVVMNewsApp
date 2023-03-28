@@ -1,8 +1,11 @@
 package com.codinginflow.mvvmnewsapp.util
 
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
 inline fun <ResultType, RequestType> networkBoundResource(
     crossinline query: () -> Flow<ResultType>,
     crossinline fetch: suspend () -> RequestType,
@@ -19,7 +22,6 @@ inline fun <ResultType, RequestType> networkBoundResource(
         }
 
         try {
-            delay(2000)
             saveFetchResult(fetch())
             onFetchSuccess()
             loading.cancel()
